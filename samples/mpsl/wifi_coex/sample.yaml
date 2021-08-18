@@ -1,0 +1,8 @@
+sample:
+  description: MPSL wifi coex sample
+  name: Wifi coex sample
+tests:
+  samples.mpsl.wifi_coex:
+    build_only: true
+    platform_allow: nrf52840dk_nrf52840 nrf5340dk_nrf5340_cpunet
+    tags: ci_build
