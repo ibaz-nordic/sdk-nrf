@@ -25,11 +25,14 @@ The application generates a grant signal on the pin selected by ``coex-pta-grant
 This pin has to be connected to the pin defined by the ``grant-gpios`` property in the DTS using a jumper.
 
 * On ``nrf52840dk_nrf52840``, the default pins are **P0.26** and **P0.02**.
+* On ``nrf5340dk_nrf5340_cpunet``, the default pins are **P0.07** and **P0.06**.
+
 
 The application senses request signal on the pin selected by ``coex-pta-req-gpios``.
 This pin has to be connected to the pin defined by the ``req-gpios`` property in the DTS using a jumper.
 
 * On ``nrf52840dk_nrf52840``, the default pins are **P0.28** and **P0.03**.
+* On ``nrf5340dk_nrf5340_cpunet``, the default pins are **P0.05** and **P0.04**.
 
 These two properties are defined in the DTS:
 
@@ -43,7 +46,7 @@ The sample supports the following development kit:
 
 .. table-from-rows:: /includes/sample_board_rows.txt
    :header: heading
-   :rows: nrf52840dk_nrf52840
+   :rows: nrf52840dk_nrf52840, nrf5340dk_nrf5340_cpunet
 
 Building and running
 ********************

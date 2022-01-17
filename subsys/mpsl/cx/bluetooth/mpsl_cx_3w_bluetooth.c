@@ -16,9 +16,21 @@
 #include <drivers/gpio.h>
 #include <devicetree.h>
 #include <nrfx.h>
-#include <nrfx_ppi.h>
 #include <nrfx_gpiote.h>
 #include <mpsl_coex.h>
+
+#if defined(CONFIG_HAS_HW_NRF_PPI)
+#include <nrfx_ppi.h>
+#define gppi_channel_t        nrf_ppi_channel_t
+#define gppi_channel_alloc    nrfx_ppi_channel_alloc
+#elif defined(CONFIG_HAS_HW_NRF_DPPIC)
+#include <nrfx_dppi.h>
+#define gppi_channel_t        uint8_t
+#define gppi_channel_alloc    nrfx_dppi_channel_alloc
+#define UNUSED_PPI_CH_ID      0xFF
+#else
+#error "No PPI or DPPI"
+#endif
 
 #define COEX_TIMER NRF_TIMER1
 
@@ -33,9 +45,10 @@
 #error Selected coex node is not compatible with sdc-radio-coex-three-wire.
 #endif
 
+/*
 #if !IS_ENABLED(CONFIG_SOC_SERIES_NRF52X)
 #error Bluetooth coex is only supported on the nRF52 series.
-#endif
+#endif */
 
 #define MPSL_COEX_BT_GPIO_POLARITY_GET(dt_property)                                                \
 	((GPIO_ACTIVE_LOW & DT_GPIO_FLAGS(COEX_NODE, dt_property)) ? false : true)
@@ -51,7 +64,7 @@ int mpsl_cx_bt_interface_3wire_config_set(void)
 {
 	nrfx_err_t err = NRFX_SUCCESS;
 	mpsl_coex_gpiote_cfg_t *gpiote_cfg;
-	nrf_ppi_channel_t ppi_channel;
+	gppi_channel_t ppi_channel;
 	mpsl_coex_if_t coex_if_bt;
 	mpsl_coex_802152_3wire_gpiote_if_t *coex_if = &coex_if_bt.interfaces.coex_3wire_gpiote;
 
@@ -60,7 +73,7 @@ int mpsl_cx_bt_interface_3wire_config_set(void)
 	if (nrfx_gpiote_channel_alloc(&gpiote_cfg->gpiote_ch_id) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
-	if (nrfx_ppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
+	if (gppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
 	gpiote_cfg->gpio_pin = NRF_DT_GPIOS_TO_PSEL(COEX_NODE, req_gpios);
@@ -72,7 +85,7 @@ int mpsl_cx_bt_interface_3wire_config_set(void)
 	if (nrfx_gpiote_channel_alloc(&gpiote_cfg->gpiote_ch_id) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
-	if (nrfx_ppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
+	if (gppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
 	gpiote_cfg->gpio_pin = NRF_DT_GPIOS_TO_PSEL(COEX_NODE, pri_dir_gpios);
@@ -84,15 +97,19 @@ int mpsl_cx_bt_interface_3wire_config_set(void)
 	if (nrfx_gpiote_channel_alloc(&gpiote_cfg->gpiote_ch_id) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
-	if (nrfx_ppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
+#if defined(CONFIG_HAS_HW_NRF_PPI)
+	if (gppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
+#else
+	ppi_channel = UNUSED_PPI_CH_ID;
+#endif
 	gpiote_cfg->gpio_pin = NRF_DT_GPIOS_TO_PSEL(COEX_NODE, grant_gpios);
 	gpiote_cfg->active_high = MPSL_COEX_BT_GPIO_POLARITY_GET(grant_gpios);
 	gpiote_cfg->ppi_ch_id = ppi_channel;
 
 	/* Allocate additional PPI channel (used for handling radio signal) */
-	if (nrfx_ppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
+	if (gppi_channel_alloc(&ppi_channel) != NRFX_SUCCESS) {
 		return -ENOMEM;
 	}
 	coex_if->additional_ppi_ch_id = ppi_channel;

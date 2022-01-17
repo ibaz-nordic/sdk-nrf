@@ -16,8 +16,14 @@
 #include <hal/nrf_egu.h>
 #include <nrfx_timer.h>
 #include <nrfx_gpiote.h>
-#include <nrfx_ppi.h>
 #include <helpers/nrfx_gppi.h>
+
+#if defined(CONFIG_HAS_HW_NRF_DPPIC)
+#include <mpsl_dppi_protocol_api.h>
+#endif
+
+#define DEBUG_GPIO
+#define ADV_CONN
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 #if (DT_NODE_HAS_PROP(ZEPHYR_USER_NODE, coex_pta_req_gpios) && \
@@ -35,10 +41,27 @@
 #define CX_NODE DT_INVALID_NODE
 #endif
 
-#define gppi_channel_t nrf_ppi_channel_t
-#define gppi_channel_alloc nrfx_ppi_channel_alloc
-
+#if defined(CONFIG_HAS_HW_NRF_PPI)
+#include <nrfx_ppi.h>
+#define gppi_channel_t        nrf_ppi_channel_t
+#define gppi_channel_alloc    nrfx_ppi_channel_alloc
 #define EGU0_IRQn SWI0_EGU0_IRQn
+#elif defined(CONFIG_HAS_HW_NRF_DPPIC)
+#include <nrfx_dppi.h>
+#define gppi_channel_t        uint8_t
+#define gppi_channel_alloc    nrfx_dppi_channel_alloc
+#else
+#error "No PPI or DPPI"
+#endif
+
+#ifdef DEBUG_GPIO
+#if defined(CONFIG_HAS_HW_NRF_PPI)
+#define DEBUG_GPIO_PIN        31
+#else
+#define DEBUG_GPIO_PIN        26
+#endif
+#endif
+
 #define APP_GRANT_TIMER NRF_TIMER2
 #define APP_GRANT_TIMER_ID 2
 #define APP_GRANT_TIMER_CC0 0
@@ -48,9 +71,25 @@
 #define STACKSIZE CONFIG_MAIN_STACK_SIZE
 #define THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
 
+
+#ifdef ADV_CONN
+#include <bluetooth/services/lbs.h>
+
+#define DEVICE_NAME             CONFIG_BT_DEVICE_NAME
+#define DEVICE_NAME_LEN         (sizeof(DEVICE_NAME) - 1)
+
+static const struct bt_data ad[] = {
+	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
+};
+static const struct bt_data sd[] = {
+	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_LBS_VAL),
+};
+#else
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 };
+#endif
 
 static const nrfx_timer_t grant_timer = NRFX_TIMER_INSTANCE(APP_GRANT_TIMER_ID);
 static volatile uint32_t radio_event_count;
@@ -109,17 +148,48 @@ static void setup_radio_event_counter(void)
 	nrf_egu_int_enable(NRF_EGU0, NRF_EGU_INT_TRIGGERED0);
 	NVIC_EnableIRQ(EGU0_IRQn);
 
+#if defined(CONFIG_HAS_HW_NRF_PPI)
 	gppi_channel_t channel = allocate_gppi_channel();
 
 	nrfx_gppi_channel_endpoints_setup(channel,
 		nrf_radio_event_address_get(NRF_RADIO, NRF_RADIO_EVENT_READY),
 		nrf_egu_task_address_get(NRF_EGU0, NRF_EGU_TASK_TRIGGER0));
 	nrfx_gppi_channels_enable(BIT(channel));
+
+#elif defined(CONFIG_HAS_HW_NRF_DPPIC)
+	nrfx_gppi_fork_endpoint_setup(MPSL_DPPI_RADIO_PUBLISH_READY_CHANNEL_IDX,
+		nrf_egu_task_address_get(NRF_EGU0, NRF_EGU_TASK_TRIGGER0));
+#endif
 }
 
 static void dummy_timer_event_handler(nrf_timer_event_t event_type, void *p_context)
 {
 }
+
+#ifdef DEBUG_GPIO
+static void debug_init(void)
+{
+	uint8_t debug_gpiote_ch;
+	config_gpiote_output(DEBUG_GPIO_PIN,
+		NRF_GPIOTE_POLARITY_TOGGLE,
+		NRF_GPIOTE_INITIAL_VALUE_LOW,
+		&debug_gpiote_ch);
+
+#if defined(CONFIG_HAS_HW_NRF_PPI)
+	gppi_channel_t channel = allocate_gppi_channel();
+
+	nrfx_gppi_channel_endpoints_setup(channel,
+		nrf_radio_event_address_get(NRF_RADIO, NRF_RADIO_EVENT_DISABLED),
+		nrf_gpiote_task_address_get(NRF_GPIOTE,
+			nrf_gpiote_out_task_get(debug_gpiote_ch)));
+	nrfx_gppi_channels_enable(BIT(channel));
+#else
+	nrfx_gppi_task_endpoint_setup(MPSL_DPPI_RADIO_PUBLISH_DISABLED_CH_IDX,
+		nrf_gpiote_task_address_get(NRF_GPIOTE,
+			nrf_gpiote_out_task_get(debug_gpiote_ch)));
+#endif
+}
+#endif
 
 static void grant_init(void)
 {
@@ -190,18 +260,32 @@ static void grant_init(void)
 static void config_pta_to_always_grant_request(void)
 {
 	nrfx_gppi_channels_disable(BIT(app_req_assert_ppi_channel));
+#if defined(CONFIG_HAS_HW_NRF_PPI)
 	nrfx_gppi_task_endpoint_setup(app_req_assert_ppi_channel,
 		nrf_gpiote_task_address_get(NRF_GPIOTE,
 			nrf_gpiote_set_task_get(app_grant_gpiote_ch)));
+#elif defined(CONFIG_HAS_HW_NRF_DPPIC)
+	nrfx_gppi_task_endpoint_clear(app_req_assert_ppi_channel,
+		nrf_gpiote_task_address_get(NRF_GPIOTE, nrf_gpiote_clr_task_get(app_grant_gpiote_ch)));
+	nrfx_gppi_task_endpoint_setup(app_req_assert_ppi_channel,
+		nrf_gpiote_task_address_get(NRF_GPIOTE, nrf_gpiote_set_task_get(app_grant_gpiote_ch)));
+#endif
 	nrfx_gppi_channels_enable(BIT(app_req_assert_ppi_channel));
 }
 
 static void config_pta_to_always_deny_request(void)
 {
 	nrfx_gppi_channels_disable(BIT(app_req_assert_ppi_channel));
+#if defined(CONFIG_HAS_HW_NRF_PPI)
 	nrfx_gppi_task_endpoint_setup(app_req_assert_ppi_channel,
 		nrf_gpiote_task_address_get(NRF_GPIOTE,
 			nrf_gpiote_clr_task_get(app_grant_gpiote_ch)));
+#elif defined(CONFIG_HAS_HW_NRF_DPPIC)
+	nrfx_gppi_task_endpoint_clear(app_req_assert_ppi_channel,
+		nrf_gpiote_task_address_get(NRF_GPIOTE, nrf_gpiote_set_task_get(app_grant_gpiote_ch)));
+	nrfx_gppi_task_endpoint_setup(app_req_assert_ppi_channel,
+		nrf_gpiote_task_address_get(NRF_GPIOTE, nrf_gpiote_clr_task_get(app_grant_gpiote_ch)));
+#endif
 	nrfx_gppi_channels_enable(BIT(app_req_assert_ppi_channel));
 }
 
@@ -277,7 +361,19 @@ void main(void)
 
 	grant_init();
 
-	if (bt_le_adv_start(BT_LE_ADV_NCONN, ad, ARRAY_SIZE(ad), NULL, 0)) {
+#ifdef DEBUG_GPIO
+	debug_init();
+#endif
+
+	int err;
+
+#ifdef ADV_CONN
+	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad),
+			      sd, ARRAY_SIZE(sd));
+#else
+	err = bt_le_adv_start(BT_LE_ADV_NCONN, ad, ARRAY_SIZE(ad), NULL, 0);
+#endif
+	if (err) {
 		printk("Advertising failed to start");
 		return;
 	}
