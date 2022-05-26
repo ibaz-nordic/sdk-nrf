@@ -1,0 +1,10 @@
+sample:
+  description: Bluetooth Low Energy PAST Peripheral
+  name: BLE PAST Peripheral
+tests:
+  sample.bluetooth.past_peripheralbuild:
+    build_only: true
+    integration_platforms:
+      - nrf52840dk_nrf52840
+    platform_allow: nrf52840dk_nrf52840
+    tags: bluetooth ci_build

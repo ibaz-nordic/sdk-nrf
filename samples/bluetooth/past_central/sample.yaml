@@ -1,0 +1,10 @@
+sample:
+  description: Bluetooth Low Energy PAST Central
+  name: BLE PAST Central
+tests:
+  sample.bluetooth.past_central.build:
+    build_only: true
+    integration_platforms:
+      - nrf52840dk_nrf52840
+    platform_allow: nrf52840dk_nrf52840
+    tags: bluetooth ci_build
