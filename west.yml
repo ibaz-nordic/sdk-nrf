@@ -52,7 +52,7 @@ manifest:
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
     - name: zephyr
       repo-path: sdk-zephyr
-      revision: d4b8ac4db1ed463928126383281b1989d200653b
+      revision: pull/937/head
       import:
         # In addition to the zephyr repository itself, NCS also
         # imports the contents of zephyr/west.yml at the above
@@ -126,7 +126,7 @@ manifest:
     - name: matter
       repo-path: sdk-connectedhomeip
       path: modules/lib/matter
-      revision: dc25aa5ea04ced739d0999c232a447651bf7a53d
+      revision: 0f6bbbda2ce7a9aa7a46e1d1e1a9bf8db38eeab9
       submodules:
         - name: nlio
           path: third_party/nlio/repo
@@ -153,7 +153,7 @@ manifest:
         - homekit
     - name: find-my
       repo-path: sdk-find-my
-      revision: 9b625ca02ed67b99661f56c76f0fe705ee3df759
+      revision: 53e288e2594e76204d18726888eb56ae7531eb5e
       groups:
         - find-my
     - name: azure-sdk-for-c
@@ -177,7 +177,7 @@ manifest:
     - name: openthread
       repo-path: sdk-openthread
       path: modules/lib/openthread
-      revision: 16c927ea1c3b7c3c83c68dc6d0d0541d569ab60d
+      revision: d3e00fbd2846c09ff29444bd7cf895d3f4cff9b6
     - name: ant
       repo-path: sdk-ant
       revision: 36b2ac9fd02988319e9dcebc578d8f9a9f5ff892
