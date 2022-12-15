@@ -14,8 +14,8 @@ static struct bt_le_ext_adv *adv_set;
 const static struct bt_le_adv_param param =
 		BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_EXT_ADV |
 				     BT_LE_ADV_OPT_USE_NAME,
-				     BT_GAP_ADV_FAST_INT_MIN_2,
-				     BT_GAP_ADV_FAST_INT_MAX_2,
+				     32, // 20ms
+				     32,
 				     NULL);
 
 static struct bt_le_ext_adv_start_param ext_adv_start_param = {
@@ -23,10 +23,13 @@ static struct bt_le_ext_adv_start_param ext_adv_start_param = {
 	.num_events = 1,
 };
 
+int32_t start;
+
 static void adv_sent(struct bt_le_ext_adv *instance,
 		     struct bt_le_ext_adv_sent_info *info)
 {
-	printk("Complete adv...\n");
+
+	printk("Complete adv...%d\n", k_uptime_get_32() - start);
 }
 
 static const struct bt_le_ext_adv_cb adv_cb = {
@@ -57,7 +60,7 @@ void main(void)
 {
 	int err;
 
-	printk("Starting PAST Beacon Demo\n");
+	printk("Starting AdvDelay Demo\n");
 
 	/* Initialize the Bluetooth Subsystem */
 	printk("Bluetooth initialization...");
@@ -85,5 +88,6 @@ void main(void)
 		printk("failed (err %d)\n", err);
 		return;
 	}
+	start = k_uptime_get_32();
 }
 
