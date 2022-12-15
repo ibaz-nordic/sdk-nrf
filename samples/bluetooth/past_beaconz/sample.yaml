@@ -1,0 +1,10 @@
+sample:
+  description: Bluetooth Low Energy PAST Beacon
+  name: BLE PAST Beacon
+tests:
+  sample.bluetooth.past_beacon.build:
+    build_only: true
+    integration_platforms:
+      - nrf52840dk_nrf52840
+    platform_allow: nrf52840dk_nrf52840
+    tags: bluetooth ci_build
